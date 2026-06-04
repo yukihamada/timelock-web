@@ -1,5 +1,6 @@
 node_modules/
 public/bundle.js
+src/_shim.js
 .DS_Store
 e2e.mjs
 *.log

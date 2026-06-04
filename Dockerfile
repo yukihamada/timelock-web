@@ -2,7 +2,8 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# build に必要なのは esbuild/buffer/tlock-js のみ。devDeps(playwright等)は入れない。
+RUN npm ci --omit=dev
 COPY build.mjs ./
 COPY src ./src
 COPY public ./public
