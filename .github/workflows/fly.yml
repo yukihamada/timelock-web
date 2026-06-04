@@ -5,7 +5,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # 暗号の正しさ（armorのbase64デコード→round抽出 / roundTimeはms / round⇄日時往復）。
+      # ネットワーク不要・決定的・数秒で完了。
+      - run: npm test
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     concurrency: deploy-group
     steps:
@@ -14,3 +28,18 @@ jobs:
       - run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: wait for rollout
+        run: sleep 20
+      - name: 本番が 200 を返すこと
+        run: |
+          curl -fsS -o /tmp/index.html -w "HTTP %{http_code}\n" https://timelock-web.fly.dev/
+      - name: enabler-analytics タグが配信されていること
+        run: |
+          grep -q 'https://enabler-analytics.fly.dev/t.js' /tmp/index.html \
+            && echo "✓ enabler-analytics タグを確認" \
+            || (echo "✗ enabler-analytics タグが見つかりません"; exit 1)

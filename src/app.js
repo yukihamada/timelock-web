@@ -149,21 +149,30 @@ const TL = {
   },
 
   // 暗号文ヘッダからラウンド番号を抜き出す（age armorはbase64包装なのでデコードしてから）
-  roundFromCiphertext(ciphertext) {
-    try {
-      const body = ciphertext
-        .split(/-----[^\n]*-----/)
-        .filter((s) => s.trim())
-        .join("")
-        .replace(/\s+/g, "");
-      const head = Buffer.from(body, "base64").toString("utf8").slice(0, 200);
-      const m = head.match(/->\s*tlock\s+(\d+)\s/);
-      return m ? parseInt(m[1], 10) : null;
-    } catch {
-      return null;
-    }
-  },
+  roundFromCiphertext,
 };
 
-window.TL = TL;
-window.dispatchEvent(new Event("tl-ready"));
+// 暗号文ヘッダからラウンド番号を抜き出す（age armorはbase64包装なのでデコードしてから）。
+// ⚠ armor は base64 包装なので、必ずデコードしてから "-> tlock <round>" を探す（既知の罠の回帰対象）。
+function roundFromCiphertext(ciphertext) {
+  try {
+    const body = ciphertext
+      .split(/-----[^\n]*-----/)
+      .filter((s) => s.trim())
+      .join("")
+      .replace(/\s+/g, "");
+    const head = Buffer.from(body, "base64").toString("utf8").slice(0, 200);
+    const m = head.match(/->\s*tlock\s+(\d+)\s/);
+    return m ? parseInt(m[1], 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ブラウザでは window.TL として公開（Node からのユニットテスト import 時は副作用なし）
+if (typeof window !== "undefined") {
+  window.TL = TL;
+  window.dispatchEvent(new Event("tl-ready"));
+}
+
+export { TL, roundFromCiphertext };

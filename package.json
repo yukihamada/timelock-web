@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.mjs",
     "serve": "npm run build && cd public && python3 -m http.server 8799",
-    "test": "node test/smoke.mjs"
+    "test": "node --test test/unit.mjs",
+    "test:e2e": "node test/smoke.mjs"
   },
   "keywords": [
     "timelock",
