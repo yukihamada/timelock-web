@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>timelock — 時間解放暗号</title>
+<meta name="description" content="指定した時刻まで誰も（運営すら）開けない暗号。drandの閾値ネットワークによるトラストレスなタイムロック暗号。すべてブラウザ内で完結。" />
+<meta name="robots" content="index,follow" />
+<meta property="og:title" content="timelock — 時間解放暗号" />
+<meta property="og:description" content="指定した時刻まで誰も開けない暗号。トラストレス・ブラウザ完結。" />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#15181d; --panel2:#1c2026; --line:#2a2f37;
+    --fg:#e8ecf1; --muted:#8b93a0; --accent:#6ee7b7; --accent2:#38bdf8;
+    --danger:#f87171; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Segoe UI",Roboto,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 20px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+  h1{font-size:24px;margin:0;letter-spacing:-.02em}
+  h1 .lk{font-weight:400;color:var(--muted)}
+  .lang{display:flex;gap:4px}
+  .lang button{background:transparent;border:1px solid var(--line);color:var(--muted);
+    padding:4px 10px;border-radius:8px;cursor:pointer;font-size:12px}
+  .lang button.on{background:var(--panel2);color:var(--fg);border-color:var(--accent)}
+  .lead{color:var(--muted);font-size:14px;margin:0 0 20px}
+  .tabs{display:flex;gap:6px;margin-bottom:16px}
+  .tabs button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    padding:10px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
+  .tabs button.on{background:var(--panel2);color:var(--fg);border-color:var(--accent)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;margin-bottom:16px}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;font-weight:600}
+  textarea,input[type=text],input[type=datetime-local]{width:100%;background:var(--bg);
+    border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:12px;
+    font-size:14px;font-family:inherit;resize:vertical}
+  textarea{min-height:120px}
+  textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+  .presets button{background:var(--bg);border:1px solid var(--line);color:var(--muted);
+    padding:5px 11px;border-radius:20px;cursor:pointer;font-size:12px}
+  .presets button:hover{border-color:var(--accent);color:var(--fg)}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .row>div{flex:1;min-width:180px}
+  .btn{background:var(--accent);color:#04261a;border:none;padding:12px 18px;border-radius:10px;
+    cursor:pointer;font-size:15px;font-weight:700;width:100%;margin-top:14px;transition:.15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.sec{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}
+  .out{margin-top:14px}
+  .pill{display:inline-block;font-size:12px;color:var(--muted);background:var(--bg);
+    border:1px solid var(--line);border-radius:20px;padding:3px 10px;margin:2px 4px 2px 0}
+  .msg{font-size:13px;padding:10px 12px;border-radius:8px;margin-top:10px;display:none}
+  .msg.err{display:block;background:rgba(248,113,113,.1);border:1px solid var(--danger);color:#fca5a5}
+  .msg.ok{display:block;background:rgba(110,231,183,.08);border:1px solid var(--accent);color:var(--accent)}
+  .copybar{display:flex;gap:8px;margin-top:8px}
+  .copybar button{flex:1}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:32px;line-height:1.8}
+  .how{font-size:13px;color:var(--muted)}
+  .how summary{cursor:pointer;color:var(--fg);font-weight:600;font-size:14px}
+  .how ul{padding-left:18px}
+  code{background:var(--bg);border:1px solid var(--line);padding:1px 6px;border-radius:5px;
+    font-size:12px;font-family:ui-monospace,monospace}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.3);
+    border-top-color:#04261a;border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔒 timelock <span class="lk" data-i18n="tagline">時間解放暗号</span></h1>
+    <div class="lang">
+      <button data-lang="ja" class="on">日本語</button>
+      <button data-lang="en">EN</button>
+    </div>
+  </header>
+  <p class="lead" data-i18n="lead">指定した時刻まで、誰も — 運営すらも — 開けない暗号。鍵を預けるサーバーはありません。</p>
+
+  <div class="tabs">
+    <button id="tab-enc" class="on" data-i18n="tab_enc">🔐 暗号化</button>
+    <button id="tab-dec" data-i18n="tab_dec">🔓 復号</button>
+  </div>
+
+  <!-- ENCRYPT -->
+  <section id="pane-enc">
+    <div class="card">
+      <label data-i18n="msg_label">メッセージ</label>
+      <textarea id="enc-text" data-i18n-ph="msg_ph" placeholder="ここに秘密のメッセージを入力…"></textarea>
+
+      <div style="margin-top:14px">
+        <label data-i18n="unlock_label">解錠時刻（この時刻まで開けません）</label>
+        <div class="presets" id="presets"></div>
+        <input type="datetime-local" id="enc-when" />
+      </div>
+
+      <button class="btn" id="enc-go" data-i18n="enc_btn">この時刻まで封印する</button>
+      <div class="msg" id="enc-msg"></div>
+
+      <div class="out hidden" id="enc-out">
+        <label data-i18n="ct_label">暗号文（この全文を相手に渡してください）</label>
+        <textarea class="mono" id="enc-result" readonly></textarea>
+        <div><span class="pill" id="enc-info"></span></div>
+        <div class="copybar">
+          <button class="btn sec" id="enc-copy" data-i18n="copy">📋 コピー</button>
+          <button class="btn sec" id="enc-dl" data-i18n="download">💾 .txt保存</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DECRYPT -->
+  <section id="pane-dec" class="hidden">
+    <div class="card">
+      <label data-i18n="ct_in_label">暗号文を貼り付け</label>
+      <textarea class="mono" id="dec-text" data-i18n-ph="ct_in_ph" placeholder="-----BEGIN AGE ENCRYPTED FILE----- …"></textarea>
+      <div><span class="pill hidden" id="dec-when"></span></div>
+      <button class="btn" id="dec-go" data-i18n="dec_btn">復号する</button>
+      <div class="msg" id="dec-msg"></div>
+      <div class="out hidden" id="dec-out">
+        <label data-i18n="pt_label">復号結果</label>
+        <textarea id="dec-result" readonly></textarea>
+        <div class="copybar"><button class="btn sec" id="dec-copy" data-i18n="copy">📋 コピー</button></div>
+      </div>
+    </div>
+  </section>
+
+  <details class="how card">
+    <summary data-i18n="how_sum">仕組みとセキュリティ（トラストレスである理由）</summary>
+    <div data-i18n-html="how_body"></div>
+  </details>
+
+  <footer>
+    <span data-i18n="foot">drand quicknet（League of Entropy）の閾値BLS署名 × IBE。暗号化・復号はすべてあなたのブラウザ内で実行されます。</span><br>
+    <a href="https://github.com/yukihamada/timelock" target="_blank">GitHub</a> ·
+    <a href="https://drand.love/" target="_blank">drand.love</a> ·
+    <span data-i18n="oss">オープンソース / 鍵を預けない設計</span>
+  </footer>
+</div>
+
+<script src="bundle.js"></script>
+<script src="i18n.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
