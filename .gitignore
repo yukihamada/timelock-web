@@ -4,3 +4,8 @@ src/_shim.js
 .DS_Store
 e2e.mjs
 *.log
+
+# local test scratch
+t_*.mjs
+*_e2e.mjs
+dbg*.mjs
