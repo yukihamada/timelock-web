@@ -38,9 +38,10 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     padding:20px;margin-bottom:16px}
   label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;font-weight:600}
-  textarea,input[type=text],input[type=datetime-local]{width:100%;background:var(--bg);
+  textarea,input[type=text],input[type=datetime-local],select{width:100%;background:var(--bg);
     border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:12px;
     font-size:14px;font-family:inherit;resize:vertical}
+  select{cursor:pointer}
   textarea{min-height:120px}
   textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
   .presets{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
@@ -94,7 +95,11 @@
   <!-- ENCRYPT -->
   <section id="pane-enc">
     <div class="card">
-      <label data-i18n="msg_label">メッセージ</label>
+      <label data-i18n="usecase_label">用途</label>
+      <select id="enc-usecase"></select>
+      <div class="hint" id="usecase-tip"></div>
+
+      <label style="margin-top:14px" data-i18n="msg_label">メッセージ</label>
       <textarea id="enc-text" data-i18n-ph="msg_ph" placeholder="ここに秘密のメッセージを入力…"></textarea>
 
       <div style="margin-top:14px">

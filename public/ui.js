@@ -22,7 +22,29 @@
       b.classList.toggle("on", b.dataset.lang === lang)
     );
     renderPresets();
+    renderUseCases();
   }
+
+  // ---- 用途プリセット ----
+  function renderUseCases() {
+    const sel = $("enc-usecase");
+    const cur = sel.value || "capsule";
+    sel.innerHTML = "";
+    t().usecases.forEach((u) => {
+      const o = document.createElement("option");
+      o.value = u.id; o.textContent = u.name;
+      sel.appendChild(o);
+    });
+    sel.value = cur;
+    updateUseCaseTip();
+  }
+  function updateUseCaseTip(applyTime) {
+    const u = t().usecases.find((x) => x.id === $("enc-usecase").value) || t().usecases[0];
+    $("usecase-tip").textContent = u.tip;
+    if (applyTime) $("enc-when").value = toLocalInput(new Date(Date.now() + u.ms));
+  }
+  // 用途を変えたときだけ既定の解錠時刻を上書き（言語切替では時刻を触らない）
+  $("enc-usecase").addEventListener("change", () => updateUseCaseTip(true));
 
   document.querySelectorAll(".lang button").forEach((b) =>
     b.addEventListener("click", () => { lang = b.dataset.lang; applyLang(); })
