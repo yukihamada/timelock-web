@@ -60,6 +60,7 @@
   .msg{font-size:13px;padding:10px 12px;border-radius:8px;margin-top:10px;display:none}
   .msg.err{display:block;background:rgba(248,113,113,.1);border:1px solid var(--danger);color:#fca5a5}
   .msg.ok{display:block;background:rgba(110,231,183,.08);border:1px solid var(--accent);color:var(--accent)}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px;padding:8px 10px;background:var(--bg);border:1px dashed var(--line);border-radius:8px}
   .copybar{display:flex;gap:8px;margin-top:8px}
   .copybar button{flex:1}
   footer{color:var(--muted);font-size:12px;text-align:center;margin-top:32px;line-height:1.8}
@@ -102,6 +103,11 @@
         <input type="datetime-local" id="enc-when" />
       </div>
 
+      <div style="margin-top:14px">
+        <label data-i18n="pass_label">合言葉（任意・付けると「時刻＋合言葉」で開封）</label>
+        <input type="text" id="enc-pass" autocomplete="off" data-i18n-ph="pass_ph" placeholder="空欄なら時刻だけで開封できます" />
+      </div>
+
       <button class="btn" id="enc-go" data-i18n="enc_btn">この時刻まで封印する</button>
       <div class="msg" id="enc-msg"></div>
 
@@ -111,8 +117,10 @@
         <div><span class="pill" id="enc-info"></span></div>
         <div class="copybar">
           <button class="btn sec" id="enc-copy" data-i18n="copy">📋 コピー</button>
+          <button class="btn sec" id="enc-link" data-i18n="copy_link">🔗 リンク</button>
           <button class="btn sec" id="enc-dl" data-i18n="download">💾 .txt保存</button>
         </div>
+        <div class="hint hidden" id="enc-passhint" data-i18n="pass_hint">⚠ 合言葉は暗号文に含まれません。相手に別経路で伝えてください。</div>
       </div>
     </div>
   </section>
@@ -123,6 +131,10 @@
       <label data-i18n="ct_in_label">暗号文を貼り付け</label>
       <textarea class="mono" id="dec-text" data-i18n-ph="ct_in_ph" placeholder="-----BEGIN AGE ENCRYPTED FILE----- …"></textarea>
       <div><span class="pill hidden" id="dec-when"></span></div>
+      <div class="passrow hidden" id="dec-passrow" style="margin-top:10px">
+        <label data-i18n="pass_in_label">合言葉</label>
+        <input type="text" id="dec-pass" autocomplete="off" data-i18n-ph="pass_in_ph" placeholder="この暗号文には合言葉が必要です" />
+      </div>
       <button class="btn" id="dec-go" data-i18n="dec_btn">復号する</button>
       <div class="msg" id="dec-msg"></div>
       <div class="out hidden" id="dec-out">
@@ -140,7 +152,7 @@
 
   <footer>
     <span data-i18n="foot">drand quicknet（League of Entropy）の閾値BLS署名 × IBE。暗号化・復号はすべてあなたのブラウザ内で実行されます。</span><br>
-    <a href="https://github.com/yukihamada/timelock" target="_blank">GitHub</a> ·
+    <a href="https://github.com/yukihamada/timelock-web" target="_blank">GitHub</a> ·
     <a href="https://drand.love/" target="_blank">drand.love</a> ·
     <span data-i18n="oss">オープンソース / 鍵を預けない設計</span>
   </footer>

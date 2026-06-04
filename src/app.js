@@ -59,20 +59,88 @@ const client = {
   },
 };
 
+// 任意の「合言葉」レイヤー（時間 かつ 合言葉 で初めて開封可）。
+// PBKDF2-SHA256(200k) → AES-256-GCM。合言葉なしの出力は素のUTF-8のまま＝tle/Timevault互換を維持。
+const MAGIC = [0x54, 0x4c, 0x4f, 0x43, 0x4b, 0x70, 0x77, 0x31]; // "TLOCKpw1"
+const PBKDF2_ITERS = 200000;
+
+async function deriveKey(passphrase, salt) {
+  const base = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: PBKDF2_ITERS, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+  );
+}
+
+async function wrapWithPassphrase(plaintext, passphrase) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(passphrase, salt);
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext))
+  );
+  return Buffer.concat([Buffer.from(MAGIC), Buffer.from(salt), Buffer.from(iv), Buffer.from(ct)]);
+}
+
+function hasMagic(buf) {
+  if (buf.length < MAGIC.length + 16 + 12 + 16) return false;
+  return MAGIC.every((b, i) => buf[i] === b);
+}
+
+async function unwrapWithPassphrase(buf, passphrase) {
+  const off = MAGIC.length;
+  const salt = buf.subarray(off, off + 16);
+  const iv = buf.subarray(off + 16, off + 28);
+  const ct = buf.subarray(off + 28);
+  const key = await deriveKey(passphrase, new Uint8Array(salt));
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, key, new Uint8Array(ct));
+  return Buffer.from(pt).toString("utf8");
+}
+
 const TL = {
-  // ISO文字列の時刻に向けて文字列を暗号化 → age armored テキストを返す
-  async encrypt(plaintext, unlockDate) {
+  // ISO文字列の時刻に向けて文字列を暗号化 → age armored テキストを返す。
+  // passphrase を渡すと「時間 かつ 合言葉」で開封可になる。
+  async encrypt(plaintext, unlockDate, passphrase) {
     const t = unlockDate.getTime();
     if (t <= Date.now()) throw new Error("解錠時刻は未来にしてください");
     const round = roundAt(t, defaultChainInfo);
-    const ct = await timelockEncrypt(round, Buffer.from(plaintext, "utf8"), client);
-    return { ciphertext: ct, round };
+    const payload = passphrase
+      ? await wrapWithPassphrase(plaintext, passphrase)
+      : Buffer.from(plaintext, "utf8");
+    const ct = await timelockEncrypt(round, payload, client);
+    return { ciphertext: ct, round, hasPassphrase: !!passphrase };
   },
 
-  // armored テキストを復号（時刻前なら例外）
-  async decrypt(ciphertext) {
-    const pt = await timelockDecrypt(ciphertext.trim(), client);
-    return Buffer.from(pt).toString("utf8");
+  // armored テキストを復号（時刻前なら例外）。合言葉付きなら passphrase が必要。
+  async decrypt(ciphertext, passphrase) {
+    const raw = Buffer.from(await timelockDecrypt(ciphertext.trim(), client));
+    if (hasMagic(raw)) {
+      if (!passphrase) {
+        const e = new Error("この暗号文には合言葉が必要です");
+        e.needPassphrase = true;
+        throw e;
+      }
+      try {
+        return await unwrapWithPassphrase(raw, passphrase);
+      } catch {
+        const e = new Error("合言葉が違います");
+        e.badPassphrase = true;
+        throw e;
+      }
+    }
+    return raw.toString("utf8");
+  },
+
+  // 暗号文が合言葉付きか（時刻到来後のみ判定可能。未到来時は null）
+  async needsPassphrase(ciphertext) {
+    try {
+      const raw = Buffer.from(await timelockDecrypt(ciphertext.trim(), client));
+      return hasMagic(raw);
+    } catch {
+      return null; // まだ復号できない＝判定不能
+    }
   },
 
   // 任意ラウンドが解錠可能になる実時刻(ms)。roundTime は既に ms を返す。

@@ -95,11 +95,14 @@
     btn.disabled = true;
     const orig = btn.textContent;
     btn.innerHTML = `<span class="spin"></span>${d.working}`;
+    const pass = $("enc-pass").value;
     try {
-      const { ciphertext, round } = await window.TL.encrypt(text, when);
+      const { ciphertext, round } = await window.TL.encrypt(text, when, pass || undefined);
       $("enc-result").value = ciphertext;
-      $("enc-info").textContent = d.locked(fmt(when.getTime())) + ` · round ${round}`;
+      $("enc-info").textContent = d.locked(fmt(when.getTime())) + ` · round ${round}` +
+        (pass ? " · 🔑" : "");
       $("enc-out").classList.remove("hidden");
+      $("enc-passhint").classList.toggle("hidden", !pass);
       msg($("enc-msg"), "ok", d.enc_done);
     } catch (e) {
       msg($("enc-msg"), "err", (e && e.message) || String(e));
@@ -127,21 +130,30 @@
     const d = t();
     const ct = $("dec-text").value;
     if (!ct.trim()) return msg($("dec-msg"), "err", d.err_ct);
+    const pass = $("dec-pass").value;
     const btn = $("dec-go");
     btn.disabled = true;
     const orig = btn.textContent;
     btn.innerHTML = `<span class="spin"></span>${d.working}`;
     try {
-      const pt = await window.TL.decrypt(ct);
+      const pt = await window.TL.decrypt(ct, pass || undefined);
       $("dec-result").value = pt;
       $("dec-out").classList.remove("hidden");
       msg($("dec-msg"), "ok", d.dec_ok);
     } catch (e) {
       let m = (e && e.message) || String(e);
-      const round = window.TL.roundFromCiphertext(ct);
-      if (/too early|decryptable at/i.test(m) && round) {
-        const ms = await window.TL.roundUnlockMs(round);
-        m = d.too_early(fmt(ms));
+      if (e && e.needPassphrase) {
+        $("dec-passrow").classList.remove("hidden");
+        $("dec-pass").focus();
+        m = d.need_pass;
+      } else if (e && e.badPassphrase) {
+        $("dec-passrow").classList.remove("hidden");
+        m = d.bad_pass;
+      } else {
+        const round = window.TL.roundFromCiphertext(ct);
+        if (/too early|decryptable at/i.test(m) && round) {
+          m = d.too_early(fmt(await window.TL.roundUnlockMs(round)));
+        }
       }
       msg($("dec-msg"), "err", m);
     } finally {
@@ -149,13 +161,13 @@
     }
   });
 
-  // ---- copy / download ----
+  // ---- copy / link / download ----
+  function flash(btn, label) {
+    const o = btn.textContent; btn.textContent = label;
+    setTimeout(() => (btn.textContent = o), 1500);
+  }
   function copy(srcId, btn) {
-    const d = t();
-    navigator.clipboard.writeText($(srcId).value).then(() => {
-      const o = btn.textContent; btn.textContent = d.copied;
-      setTimeout(() => (btn.textContent = o), 1500);
-    });
+    navigator.clipboard.writeText($(srcId).value).then(() => flash(btn, t().copied));
   }
   $("enc-copy").addEventListener("click", (e) => copy("enc-result", e.target));
   $("dec-copy").addEventListener("click", (e) => copy("dec-result", e.target));
@@ -167,5 +179,37 @@
     a.click();
   });
 
+  // 共有リンク: 暗号文を URL の #c= に埋める（# はサーバーに送られない）
+  function b64urlEncode(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlDecode(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    return decodeURIComponent(escape(atob(s)));
+  }
+  $("enc-link").addEventListener("click", (e) => {
+    const ct = $("enc-result").value;
+    const hash = b64urlEncode(ct);
+    if (hash.length > 7000) return msg($("enc-msg"), "err", t().link_too_long);
+    const link = location.origin + location.pathname + "#c=" + hash;
+    navigator.clipboard.writeText(link).then(() => flash(e.target, t().link_copied));
+  });
+
+  // 起動時: #c=... があれば復号タブに自動入力
+  function loadFromHash() {
+    const h = location.hash;
+    if (!h.startsWith("#c=")) return;
+    try {
+      const ct = b64urlDecode(h.slice(3));
+      showTab("dec");
+      $("dec-text").value = ct;
+      $("dec-text").dispatchEvent(new Event("input"));
+    } catch { /* ignore malformed */ }
+  }
+
+  window.addEventListener("hashchange", loadFromHash);
+
   applyLang();
+  loadFromHash();
 })();
