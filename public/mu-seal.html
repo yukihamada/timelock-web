@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>MU 封印ドロップ作成ツール</title>
+<style>
+  :root{--bg:#0b0d10;--panel:#15181d;--line:#2a2f37;--fg:#e8ecf1;--muted:#8b93a0;--accent:#6ee7b7}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Hiragino Sans",sans-serif;line-height:1.6}
+  .wrap{max-width:680px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:20px}.lead{color:var(--muted);font-size:13px}
+  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 5px;font-weight:600}
+  input,textarea{width:100%;background:#000;border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:11px;font-size:14px;font-family:inherit}
+  textarea{min-height:110px;resize:vertical}
+  .row{display:flex;gap:10px}.row>div{flex:1}
+  button{background:var(--accent);color:#04261a;border:none;padding:12px 18px;border-radius:9px;cursor:pointer;font-size:15px;font-weight:700;width:100%;margin-top:18px}
+  .out{margin-top:16px;display:none}
+  pre{background:#000;border:1px solid var(--line);border-radius:9px;padding:12px;font-size:11px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+  .msg{font-size:13px;margin-top:10px;padding:9px 11px;border-radius:8px;display:none}
+  .err{display:block;background:rgba(248,113,113,.1);border:1px solid #f87171;color:#fca5a5}
+  .ok{display:block;background:rgba(110,231,183,.08);border:1px solid var(--accent);color:var(--accent)}
+  .cp{background:var(--panel);color:var(--fg);border:1px solid var(--line);width:auto;padding:7px 12px;font-size:12px;margin-top:8px}
+  small{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔒 MU 封印ドロップ作成ツール</h1>
+  <p class="lead">中身は<b>このブラウザ内</b>で timelock 暗号化され、サーバー(MU/運営)には解禁時刻まで平文が渡りません。出力された <code>curl</code> を実行すると、MU に <b>status=draft</b> の封印ドロップが作成されます（公開棚には出ない・直URLで確認→人が live に）。</p>
+
+  <label>公開タイトル（label・封印中も表に出る名前）</label>
+  <input id="label" placeholder="例: MU 封印ドロップ #001">
+
+  <label>中身（解禁時に表示される本文・これが暗号化されます）</label>
+  <textarea id="content" placeholder="限定シリアル・解禁メッセージ・コンセプトなど"></textarea>
+
+  <div class="row">
+    <div><label>解禁日時</label><input type="datetime-local" id="unlock"></div>
+    <div><label>価格(円・任意)</label><input type="number" id="price" placeholder="0" min="0"></div>
+  </div>
+  <div class="row">
+    <div><label>brand(任意)</label><input id="brand" placeholder="minna"></div>
+    <div><label>MU ベースURL</label><input id="base" value="https://wearmu.com"></div>
+  </div>
+  <label>MU ADMIN_TOKEN</label>
+  <input id="token" type="password" placeholder="mu-brand/.secrets.local の ADMIN_TOKEN">
+
+  <button id="go">封印して curl を生成</button>
+  <div class="msg" id="msg"></div>
+
+  <div class="out" id="out">
+    <label>① 実行する curl（ターミナルに貼って実行）</label>
+    <pre id="curl"></pre>
+    <button class="cp" id="cpcurl">📋 curl をコピー</button>
+    <label>② 確認URL（解禁前は封印表示・解禁後に自動復号）</label>
+    <pre id="url"></pre>
+  </div>
+</div>
+<script src="bundle.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  // 既定: 1時間後（デモしやすく）
+  (function(){const d=new Date(Date.now()+3600e3);const o=d.getTimezoneOffset()*60000;$("unlock").value=new Date(d-o).toISOString().slice(0,16);})();
+  function msg(k,t){const m=$("msg");m.className="msg "+k;m.textContent=t;}
+  function shq(s){return "'"+String(s).replace(/'/g,"'\\''")+"'";}
+  $("go").addEventListener("click",async()=>{
+    const label=$("label").value.trim(), content=$("content").value, unlockV=$("unlock").value, token=$("token").value.trim();
+    if(!label) return msg("err","公開タイトルを入れてください");
+    if(!content.trim()) return msg("err","中身を入れてください");
+    if(!unlockV) return msg("err","解禁日時を選んでください");
+    if(!token) return msg("err","ADMIN_TOKEN を入れてください");
+    const when=new Date(unlockV);
+    if(when.getTime()<=Date.now()) return msg("err","解禁日時は未来にしてください");
+    if(!window.TL) return msg("err","timelock 読込中。少し待って再試行してください");
+    $("go").disabled=true; msg("ok","暗号化中…");
+    try{
+      const {ciphertext}=await window.TL.encrypt(content, when);
+      const sku="MU-SEAL-"+Math.random().toString(36).slice(2,10).toUpperCase();
+      const unlock_iso=when.toISOString();
+      const base=($("base").value||"https://wearmu.com").replace(/\/$/,"");
+      const params=new URLSearchParams({token,sku,label,ciphertext,unlock_iso});
+      if($("price").value) params.set("price_jpy",$("price").value);
+      if($("brand").value.trim()) params.set("brand",$("brand").value.trim());
+      const fullUrl=base+"/admin/catalog/seal?"+params.toString();
+      // curl: トークンは表示するが、URLは長いので body 化せずGET(house style)
+      $("curl").textContent="curl -sS "+shq(fullUrl);
+      $("url").textContent=base+"/shop/"+sku+"  （解禁: "+unlock_iso+"）";
+      $("out").style.display="block";
+      msg("ok","封印完了。curl を実行すると draft で作成されます。");
+    }catch(e){ msg("err","失敗: "+(e.message||e)); }
+    finally{ $("go").disabled=false; }
+  });
+  $("cpcurl").addEventListener("click",e=>{navigator.clipboard.writeText($("curl").textContent).then(()=>{e.target.textContent="✓ コピー";setTimeout(()=>e.target.textContent="📋 curl をコピー",1500);});});
+})();
+</script>
+</body>
+</html>
