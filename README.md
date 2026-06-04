@@ -174,7 +174,13 @@ A. コア技術（drand tlock）は同じです。本ツールは **日本語UI 
 
 ## ライセンス
 
-MIT License. 暗号処理は drand 公式の `tlock-js`（MIT/Apache-2.0）を利用しています。
+本体は [MIT License](./LICENSE)。組み込み OSS（`tlock-js` / `@noble/*` / `@stablelib/*` ほか）の
+著作権表示は [THIRD_PARTY_LICENSES.md](./THIRD_PARTY_LICENSES.md) に集約しています。
+全依存はパーミッシブ（MIT / Apache-2.0 / BSD-3）で、コピーレフトは含みません。
+`tlock-js` は Apache-2.0 を選択でき、**明示的な特許許諾**を伴います。
+
+> 本ツールは drand / Cloudflare / League of Entropy の**非公式**クライアントです。
+> 公式・公認をうたうものではなく、上流プロジェクトへのリスペクトとして出典を明記しています。
 
 ## 謝辞
 
